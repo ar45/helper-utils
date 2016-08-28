@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+
+import os
+import re
+import sys
+
+
+USAGE = """
+USAGE:
+	sys.argv[0] <file>
+"""
+
+if not len(sys.argv) == 2:
+    sys.stderr.write(USAGE)
+    exit(1)
+
+
+infile = sys.argv[1]
+var_regex = re.compile(r'\$\{([^}-]+?)(?:-(["\'])([^\2]*?)\2)?\}')
+
+
+def sub(match):
+    try:
+        val = os.environ[match.group(1)]
+    except KeyError:
+        if not match.group(2):
+            print('No value for "{}" set and niether a default was provided'.format(match.group(1)), file=sys.stderr)
+            raise
+        val = match.group(3)
+    return val
+
+
+with open(infile, 'r') as _in:
+    for line in _in.readlines():
+        try:
+            replaced = var_regex.sub(sub, line)
+            sys.stdout.write(replaced)
+        except KeyError:
+            print('Unresolved reference near "{}"'.format(line), file=sys.stderr)
+            exit(2)

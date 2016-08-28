@@ -1,0 +1,10 @@
+
+sudo_cmd()
+{
+	if [ `whoami` = root ]; then
+		"$@"
+	else
+		sudo "$@"
+	fi
+}
+
