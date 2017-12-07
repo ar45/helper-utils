@@ -1,0 +1,18 @@
+#!/bin/bash
+
+__curdir=`dirname ${BASH_SOURCE[0]}`
+source $__curdir/helpers
+
+
+install_node()
+{
+        which node && node --version | grep -E -q '^v(6|7|8)' >/dev/null 2>&1 || {
+                PREFIX=/usr/local && sudo_cmd mkdir -p $PREFIX
+                file=`mktemp`
+                wget -O $file 'https://nodejs.org/dist/v6.1.0/node-v6.1.0-linux-x64.tar.xz'
+                sudo_cmd tar -xvf $file --strip-components=1 -C $PREFIX
+                rm -f $file
+        }
+}
+
+install_node
