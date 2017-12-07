@@ -8,3 +8,29 @@ sudo_cmd()
 	fi
 }
 
+exit_error()
+{
+	echo "$1" >&2;
+	exit 1
+}
+
+
+confirm()
+{
+	local answer
+
+	while true; do
+		read -p "$1 (Y/N) ? " answer
+		case $answer in
+			y|Y)
+				return 0;
+			;;
+
+			n|N)
+				return 1;
+			;;
+
+			*) ;;
+		esac
+	done;
+}

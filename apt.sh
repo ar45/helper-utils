@@ -23,7 +23,7 @@ ensure_packages()
 		packages_to_install="$REQUIRED_PACKAGES"
 	else
 		for pkg in $REQUIRED_PACKAGES; do
-			dpkg -l $pkg >/dev/null 2>&1 || packages_to_install="$packages_to_install $pkg";
+			dpkg -s $pkg >/dev/null 2>&1 || packages_to_install="$packages_to_install $pkg";
 		done
 	fi
 
@@ -46,7 +46,7 @@ setup_postgres_ppa()
 
 
 # Ignore if it is sourced
-if [ ! -z "$*" ]; then
+if [ "$0" = "$BASH_SOURCE" ]; then
 	"$@"
 fi
 
