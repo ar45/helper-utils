@@ -1,0 +1,165 @@
+#!/bin/bash
+
+
+
+read -r -d '' USAGE <<EOF
+USAGE: $0
+	--repo-url git-url
+	[--destination-dir dest]	Clone into <dest>. If /path/to/dest/ ends with a "/", the repo name will be appended to the destination dir.
+	[--git-ref {ref/tag}]		Checkout / Clone to the specified ref/tag
+	[--remote]			The remote name (Defaults to origin)
+	[--checkout]			Checkout <git-ref> if repo is already cloned
+	[--stash]		Force checkout by stashing local changes.
+	[--no-update-local]		Do not update local branch
+
+	-h | --help				Display this help.
+
+EOF
+
+usage()
+{
+	echo "$USAGE";
+	exit 1;
+}
+
+exit_error()
+{
+	echo "$1";
+	[ $# -gt 1 ] && exit $2 || exit 1
+}
+
+
+ARGS=`getopt -o 'h' -l 'help,repo-url:,destination-dir:,git-ref:,remote:,checkout,stash,no-update-local' -n "$0" -- "$@"`
+
+if [ $? != 0 ]; then
+	usage
+fi
+
+
+repo_url=
+remote_name=origin
+destination_dir=
+git_ref=
+checkout=false
+stash=false
+update_local=true
+
+
+eval set -- "$ARGS"
+
+while [ $# -gt 0 ] ; do
+	case "$1" in
+		--repo-url)
+			repo_url="$2"
+			shift 2
+			;;
+		--destination-dir)
+			destination_dir="$2"
+			shift 2
+			;;
+		--git-ref)
+			git_ref="$2"
+			shift 2
+			;;
+		--remote)
+			remote_name=$2
+			shift 2
+			;;
+		--checkout)
+			checkout=true
+			shift
+			;;
+		--stash)
+			stash=true
+			shift
+			;;
+		--no-update-local)
+			update_local=false
+			shift
+			;;
+		--help|-h)
+			usage
+			;;
+		--)
+			shift
+			;;
+		*)
+			echo "Got invalid argument $@" 2>&1
+			usage
+			;;
+	esac
+done
+
+if [ -z "$repo_url" ]; then
+	usage
+fi
+
+if [ -z "$destination_dir" ]; then
+	d=`basename $repo_url`
+	destination_dir="${PWD}/${d%.git}"
+elif [ "${destination_dir: -1:1}" = "/" ]; then
+	d=`basename $repo_url`
+	destination_dir="${destination_dir}${d}"
+fi
+
+if [ -z "$git_ref" ] && $checkout; then
+	echo "Cannot checkout without specifying --git-ref" >&2;
+	exit 3
+fi
+
+repo_path="`echo "$repo_url" | sed 's/.*:/:/g'`";
+
+cat <<EOF
+Cloning / Updating repo:
+	repo_url	= $repo_url
+	repo_path	= $repo_path
+	remote_name	= $remote_name
+	destination_dir	= $destination_dir
+	git_ref		= $git_ref
+	checkout	= $checkout
+	stash		= $stash
+	update_local	= $update_local
+EOF
+
+
+clone_repo()
+{
+	local opts=()
+	if [ ! -z "$remote_name" ]; then
+		opts+=("--origin" "$remote_name")
+	fi
+
+	if [ -d $destination_dir/.git ]; then
+		if ! git --git-dir=$destination_dir/.git remote -v | grep -q "$repo_path"; then
+			exit_error "$destination_dir is not empty and is not a clone of $repo_path repo"
+
+		elif ! git --git-dir=$destination_dir/.git remote -v | grep -q "^$remote_name[[:space:]].*$repo_path"; then
+			exit_error "$destination_dir does not have a remote with the name '$remote_name'"
+
+		fi
+
+		cd "$destination_dir" && refresh_git_repo "$git_ref"
+	else
+		git clone $repo_url ${opts[@]} -b "$git_ref" "$destination_dir"
+	fi
+}
+
+
+refresh_git_repo()
+{
+	local ref="$1"
+	git fetch "$remote_name" --tags || exit_error "Could not fetch from remote [$remote_name]"
+	if $stash; then
+		git stash --include-untracked || exit_error "Failed to stash local changes"
+	fi
+
+	if $checkout; then
+		git checkout ${ref} || exit_error "Failed to checkout ${ref}"
+	fi
+
+	if $update_local; then
+		git pull --ff-only || exit_error "Failed to fast-forward from remote."
+	fi
+}
+
+clone_repo
